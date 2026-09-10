@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MusiqLock • Radio 24/7</title>
+  <meta name="description" content="Radio 24/7 sincronizada en tiempo real con fondos dinámicos de skylines según el ciclo circadiano.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📻</text></svg>">
+</head>
+<body class="phase-default">
+
+  <!-- Fondos Panorámicos en Vídeo con Transición Suave (Cross-Fade) -->
+  <div class="wallpaper-video-layer active" id="videoLayerA">
+    <video class="wallpaper-video" id="wallpaperVideoA" autoplay muted loop playsinline preload="auto"></video>
+  </div>
+  <div class="wallpaper-video-layer" id="videoLayerB">
+    <video class="wallpaper-video" id="wallpaperVideoB" autoplay muted loop playsinline preload="auto"></video>
+  </div>
+  <div class="wallpaper-vignette"></div>
+
+  <!-- Botones Superiores Izquierda: Parrilla 24h y Modo Cuadro Digital -->
+  <aside class="top-schedule-widget">
+    <button class="btn-schedule-pill" id="btnToggleSchedule" title="Ver parrilla completa de 24 horas" aria-label="Ver parrilla completa de 24 horas">
+      <span class="schedule-icon">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="16" y1="2" x2="16" y2="6"></line>
+          <line x1="8" y1="2" x2="8" y2="6"></line>
+          <line x1="3" y1="10" x2="21" y2="10"></line>
+        </svg>
+      </span>
+      <span class="schedule-label">Parrilla 24h</span>
+    </button>
+
+    <button class="btn-frame-pill" id="btnToggleFrame" title="Modo Cuadro Digital • Pantalla completa y reloj centrado (Tecla F)" aria-label="Modo Cuadro Digital">
+      <span class="frame-icon">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+        </svg>
+      </span>
+    </button>
+  </aside>
+
+  <!-- Notificación Toast de Modo Cuadro Digital -->
+  <div class="frame-toast" id="frameToast">Modo Cuadro Digital • Pulsa F o Esc para salir</div>
+
+  <!-- Widget Superior Derecho de Reloj y Fecha -->
+  <aside class="top-clock-widget">
+    <div class="clock-time" id="masterClock">14:32:11</div>
+    <div class="clock-date" id="masterDate">8 September</div>
+  </aside>
+
+  <!-- Barra Minimalista Flotante de Audio (HUD) -->
+  <div class="audio-hud" id="audioHud">
+
+    <!-- Pista en Reproducción (Visible al estar sintonizado) -->
+    <div class="hud-track-info" id="hudTrackInfo">
+      <div class="hud-text-group">
+        <div class="hud-title" id="trackTitle">Sintonizando emisión...</div>
+        <div class="hud-meta">
+          <span class="hud-artist" id="trackArtist">Calculando segundo exacto</span>
+          <span class="hud-bullet">•</span>
+          <span class="hud-phase" id="phaseName">Fase</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Controles de Reproducción: Botón Sintonizar/En Vivo y Volumen -->
+    <div class="hud-controls">
+
+      <button class="btn-tune-pill" id="btnTuneIn" title="Sintonizar / Pausar emisión">
+        <span class="tune-icon" id="tuneIcon">▶</span>
+        <span class="tune-label" id="btnTuneText">Sintonizar</span>
+      </button>
+
+      <div class="volume-box" id="volumeBox">
+        <button class="btn-mute" id="btnMute" title="Silenciar / Activar sonido">
+          <svg id="volumeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          </svg>
+        </button>
+        <div class="volume-slider-wrapper">
+          <input type="range" id="volumeSlider" min="0" max="100" value="85" class="vol-range" title="Volumen">
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Modal Parrilla 24 Horas -->
+  <div class="schedule-modal" id="scheduleModal">
+    <div class="schedule-panel">
+      <div class="schedule-header">
+        <div>
+          <h2>Parrilla de Emisión 24 Horas</h2>
+          <p class="schedule-subtitle">86.400 segundos matemáticamente continuos</p>
+        </div>
+        <button class="btn-close" id="btnCloseSchedule" title="Cerrar">&times;</button>
+      </div>
+
+      <!-- Pestañas de Fases Circadianas -->
+      <div class="schedule-tabs" id="scheduleTabs"></div>
+
+      <!-- Listado de Canciones -->
+      <div class="schedule-list" id="scheduleList"></div>
+    </div>
+  </div>
+
+  <!-- Elemento Audio Local para el Cierre Ritual con sydney.mp3 -->
+  <audio id="localAudio" preload="auto" src="sydney.mp3"></audio>
+
+  <!-- Contenedor Oculto YouTube IFrame API (Dual Player para Cross-fade y Precarga) -->
+  <div id="playerHost" style="position: fixed; width: 200px; height: 200px; opacity: 0.001; pointer-events: none; top: -9999px; left: -9999px; z-index: -1;">
+    <div id="youtubePlayerA"></div>
+    <div id="youtubePlayerB"></div>
+  </div>
+
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script src="schedule.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

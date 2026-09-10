@@ -1,0 +1,1035 @@
+/* ==========================================================================
+   MusiqLock: Radio 24/7 Sincronizada
+   Diseño Panorámico con Fondos Dinámicos de Skylines y Reloj Superior Derecho
+   ========================================================================== */
+
+:root {
+  --text-white: #ffffff;
+  --text-dim: rgba(255, 255, 255, 0.75);
+  --text-muted: rgba(255, 255, 255, 0.5);
+
+  --hud-bg: rgba(12, 14, 20, 0.68);
+  --hud-border: rgba(255, 255, 255, 0.12);
+  --hud-hover: rgba(255, 255, 255, 0.22);
+
+  --color-live: #ef4444;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --radius-full: 9999px;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  background-color: #050608;
+  color: var(--text-white);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ==========================================================================
+   Fondos Dinámicos de Skylines en Vídeo (Cross-Fade Suave entre Fases)
+   ========================================================================== */
+.wallpaper-video-layer,
+.wallpaper-background {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  opacity: 0;
+  overflow: hidden;
+  background-color: #050608;
+  background-size: cover;
+  background-position: center;
+  transition: opacity 1.8s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: opacity;
+}
+
+.wallpaper-video-layer.active,
+.wallpaper-background.active {
+  opacity: 1;
+}
+
+.wallpaper-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  transform: scale(1.03);
+  pointer-events: none;
+}
+
+/* Viñeta para resaltar el reloj en la esquina superior derecha exactamente como en la imagen */
+.wallpaper-vignette {
+  position: fixed;
+  inset: 0;
+  background: 
+    linear-gradient(to left, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0.24) 28%, rgba(0, 0, 0, 0) 55%),
+    linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0) 30%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ==========================================================================
+   Widget Superior Derecho: Reloj & Fecha (Idéntico a la imagen)
+   ========================================================================== */
+.top-clock-widget {
+  position: fixed;
+  top: 2.25rem;
+  left: calc(100% - 3.5rem);
+  transform: translateX(-100%);
+  text-align: right;
+  z-index: 10;
+  user-select: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  background: transparent !important;
+  filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.65));
+  transition: top 0.75s cubic-bezier(0.16, 1, 0.3, 1),
+              left 0.75s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.75s cubic-bezier(0.16, 1, 0.3, 1),
+              filter 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.clock-time {
+  font-family: var(--font-sans);
+  font-size: 4.2rem;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  text-shadow: none !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.clock-date {
+  font-family: var(--font-sans);
+  font-size: 1.55rem;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.88);
+  margin-top: 0.5rem;
+  letter-spacing: -0.01em;
+  text-shadow: none !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Animación de rodillo vertical limpia: sin fondos, bordes ni cajas */
+.roll-slot {
+  display: inline-block;
+  position: relative;
+  overflow: hidden;
+  height: 1.15em;
+  line-height: 1.15em;
+  vertical-align: middle;
+  text-align: center;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.clock-time .roll-slot.is-digit {
+  width: 0.65em;
+  min-width: 0.65em;
+}
+
+.clock-time .roll-slot.is-sep {
+  width: 0.32em;
+  min-width: 0.32em;
+  opacity: 0.85;
+}
+
+.clock-date .roll-slot.is-digit {
+  width: 0.62em;
+  min-width: 0.62em;
+}
+
+.clock-date .roll-slot.is-space {
+  width: 0.35em;
+  min-width: 0.35em;
+}
+
+.clock-date .roll-slot.is-char {
+  min-width: 0.45em;
+}
+
+.roll-unit {
+  display: block;
+  width: 100%;
+  height: 100%;
+  line-height: 1.15em;
+  text-align: center;
+  will-change: transform;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+.roll-unit.roll-current {
+  position: relative;
+  transform: translateY(0);
+}
+
+.roll-unit.roll-next {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  transform: translateY(100%);
+}
+
+.roll-unit.animate-out {
+  transform: translateY(-100%);
+  opacity: 0.7;
+  transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.42s ease;
+}
+
+.roll-unit.animate-in {
+  transform: translateY(0);
+  opacity: 1;
+  transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.42s ease;
+}
+
+/* ==========================================================================
+   Widget Superior Izquierdo: Botón Parrilla 24h en la Esquina
+   - Por defecto: Microicono discreto y minimalista en la esquina
+   - Al pasar el ratón (hover): Expansión fluida horizontal que revela "Parrilla 24h"
+   ========================================================================== */
+.top-schedule-widget {
+  position: fixed;
+  top: 1.75rem;
+  left: 1.75rem;
+  z-index: 50;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  transition: opacity 0.45s ease, transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.top-schedule-widget .btn-schedule-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px;
+  width: 38px;
+  min-width: 38px;
+  padding: 0;
+  background: rgba(12, 14, 22, 0.55);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 500;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  transition: all 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+.top-schedule-widget .schedule-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.9);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), color 0.25s ease;
+}
+
+.top-schedule-widget .schedule-icon svg {
+  display: block;
+  stroke: currentColor;
+}
+
+.top-schedule-widget .schedule-label {
+  display: inline-block;
+  max-width: 0;
+  opacity: 0;
+  margin-left: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  letter-spacing: 0.02em;
+  color: #ffffff;
+  transition: max-width 0.32s cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 0.22s ease,
+              margin-left 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Estado Hover / Focus: Expansión suave y estilosa */
+.top-schedule-widget .btn-schedule-pill:hover,
+.top-schedule-widget .btn-schedule-pill:focus-visible {
+  width: auto;
+  min-width: unset;
+  padding: 0 1rem 0 0.8rem;
+  background: rgba(18, 22, 32, 0.85);
+  border-color: rgba(255, 255, 255, 0.28);
+  transform: translateY(-1px) scale(1.02);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5), 0 0 16px rgba(255, 255, 255, 0.08);
+}
+
+.top-schedule-widget .btn-schedule-pill:hover .schedule-icon,
+.top-schedule-widget .btn-schedule-pill:focus-visible .schedule-icon {
+  transform: scale(1.08);
+  color: #38bdf8;
+}
+
+.top-schedule-widget .btn-schedule-pill:hover .schedule-label,
+.top-schedule-widget .btn-schedule-pill:focus-visible .schedule-label {
+  max-width: 140px;
+  opacity: 1;
+  margin-left: 0.45rem;
+}
+
+/* Micro-botón Modo Cuadro Digital (Pantalla Completa) */
+.btn-frame-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px;
+  width: 38px;
+  min-width: 38px;
+  padding: 0;
+  background: rgba(12, 14, 22, 0.55);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.85);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-frame-pill:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #38bdf8;
+  transform: translateY(-1px) scale(1.04);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5), 0 0 16px rgba(56, 189, 248, 0.2);
+}
+
+/* Toast flotante de Modo Cuadro Digital */
+.frame-toast {
+  position: fixed;
+  top: 2rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(-25px);
+  background: rgba(10, 12, 18, 0.85);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.95);
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 500;
+  padding: 0.5rem 1.25rem;
+  border-radius: var(--radius-full);
+  z-index: 200;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.7);
+}
+
+.frame-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ==========================================================================
+   Barra HUD Minimalista Flotante (Abajo)
+   - Visible todo el rato fija como en la foto cuando está sintonizado
+   - Cuando NO estás sintonizado: solo sale el botón de sintonizar
+   - Al sintonizar: sale songname, author, botón En Vivo y volumen
+   ========================================================================== */
+.audio-hud {
+  position: fixed;
+  bottom: 2.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(10, 12, 16, 0.78);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-full);
+  display: inline-flex;
+  align-items: center;
+  z-index: 15;
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+/* Estado NO Sintonizado: sólo sale el botón de sintonizar */
+.audio-hud:not(.is-tuned) {
+  padding: 0.35rem;
+  background: rgba(10, 12, 16, 0.65);
+}
+
+.audio-hud:not(.is-tuned) .hud-track-info,
+.audio-hud:not(.is-tuned) .volume-box {
+  display: none;
+}
+
+.audio-hud:not(.is-tuned) .btn-tune-pill {
+  background: #ffffff;
+  color: #000000;
+  font-weight: 600;
+  padding: 0.55rem 1.35rem;
+  box-shadow: 0 4px 15px rgba(255, 255, 255, 0.15);
+}
+
+.audio-hud:not(.is-tuned) .btn-tune-pill:hover {
+  background: #f1f5f9;
+  transform: translateY(-1px);
+}
+
+/* Estado Sintonizado: barra fija completa idéntica a la captura */
+.audio-hud.is-tuned {
+  padding: 0.6rem 1.35rem;
+  gap: 1.4rem;
+}
+
+.hud-track-info {
+  display: flex;
+  align-items: center;
+  min-width: 190px;
+  max-width: 320px;
+}
+
+.hud-text-group {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.hud-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.01em;
+}
+
+.hud-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.65);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hud-artist {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hud-bullet {
+  opacity: 0.45;
+}
+
+.hud-phase {
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
+}
+
+/* Controles */
+.hud-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-shrink: 0;
+}
+
+/* Botón Sintonizar / En Vivo estilo píldora como en la foto */
+.btn-tune-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 0.48rem 1rem;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-tune-pill:hover {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.28);
+  transform: translateY(-1px);
+}
+
+.btn-tune-pill.active {
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.tune-icon {
+  font-size: 0.72rem;
+}
+
+/* Botón de Volumen estilo botón circular/píldora con slider que se despliega al hover */
+.volume-box {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 0.48rem 0.55rem;
+  border-radius: var(--radius-full);
+  transition: all 0.25s ease;
+  position: relative;
+}
+
+.volume-box:hover,
+.volume-box:focus-within {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.btn-mute {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: color 0.2s ease;
+}
+
+.btn-mute:hover {
+  color: #ffffff;
+}
+
+.btn-mute svg {
+  width: 16px;
+  height: 16px;
+}
+
+.volume-slider-wrapper {
+  display: flex;
+  align-items: center;
+  height: 24px;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transition: max-width 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease, margin 0.3s ease;
+  margin-left: 0;
+  padding: 0;
+}
+
+.volume-box:hover .volume-slider-wrapper,
+.volume-box:focus-within .volume-slider-wrapper {
+  max-width: 95px;
+  opacity: 1;
+  pointer-events: auto;
+  margin-left: 0.5rem;
+  margin-right: 0.35rem;
+  padding: 0 4px;
+  overflow: visible;
+}
+
+.vol-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 74px;
+  height: 4px;
+  background: linear-gradient(to right, #ffffff 0%, #ffffff 85%, rgba(255, 255, 255, 0.22) 85%, rgba(255, 255, 255, 0.22) 100%);
+  border-radius: 9999px;
+  outline: none;
+  cursor: pointer;
+  margin: 0;
+  padding: 0;
+  vertical-align: middle;
+}
+
+/* Webkit (Chrome, Edge, Safari, Opera) */
+.vol-range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: transparent;
+}
+
+.vol-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ffffff;
+  cursor: pointer;
+  margin-top: -4px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.vol-range:hover::-webkit-slider-thumb,
+.vol-range:active::-webkit-slider-thumb {
+  transform: scale(1.2);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.7), 0 0 0 2px rgba(255, 255, 255, 0.25);
+}
+
+/* Firefox */
+.vol-range::-moz-range-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: transparent;
+}
+
+.vol-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  background: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.vol-range:hover::-moz-range-thumb,
+.vol-range:active::-moz-range-thumb {
+  transform: scale(1.2);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.7), 0 0 0 2px rgba(255, 255, 255, 0.25);
+}
+
+/* Botón Ciudad */
+.btn-city-pill {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 500;
+  padding: 0.55rem 0.95rem;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-city-pill:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.btn-city-pill .city-icon {
+  font-size: 0.85rem;
+}
+
+
+
+/* ==========================================================================
+   Modal Parrilla 24 Horas
+   ========================================================================== */
+.schedule-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 100;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.schedule-modal.active {
+  display: flex;
+}
+
+.schedule-panel {
+  width: 100%;
+  max-width: 680px;
+  height: 82vh;
+  background: rgba(14, 16, 22, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.9);
+  overflow: hidden;
+  position: relative;
+}
+
+.schedule-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem 1.75rem 1.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.schedule-header h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+
+.schedule-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.75rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  line-height: 1;
+  transition: color 0.2s ease;
+}
+
+.btn-close:hover {
+  color: #fff;
+}
+
+.schedule-tabs {
+  display: flex;
+  overflow-x: auto;
+  gap: 0.5rem;
+  padding: 0.85rem 1.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+  scrollbar-width: none;
+}
+
+.schedule-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-dim);
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 0.35rem 0.85rem;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.tab-btn.active {
+  background: #ffffff;
+  color: #000000;
+  border-color: #ffffff;
+  font-weight: 600;
+}
+
+.schedule-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.25rem 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.schedule-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.schedule-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.schedule-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+}
+
+.schedule-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.schedule-item {
+  display: grid;
+  grid-template-columns: 105px 1fr auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.8rem 1rem;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  transition: all 0.15s ease;
+}
+
+.schedule-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.schedule-item.current {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.item-time {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.schedule-item.current .item-time {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.item-info {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.item-title {
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.92rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.01em;
+}
+
+.item-artist {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.item-badge {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-full);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   Responsive Adaptations
+   ========================================================================== */
+@media (max-width: 900px) {
+  .top-schedule-widget {
+    top: 1.5rem;
+    left: 1.5rem;
+  }
+  .top-clock-widget {
+    top: 1.5rem;
+    right: 1.5rem;
+  }
+  .clock-time {
+    font-size: 2.8rem;
+  }
+  .clock-date {
+    font-size: 1.15rem;
+  }
+  .audio-hud {
+    bottom: 1.25rem;
+    max-width: calc(100% - 2rem);
+  }
+  .hud-track-info {
+    min-width: 140px;
+    max-width: 180px;
+  }
+}
+
+/* ==========================================================================
+   Modo Inmersivo Automático (Auto-Hide / Zen Mode)
+   - Si no hay movimiento de ratón tras unos segundos, el HUD, reloj y
+     microicono se atenúan suavemente dejando el protagonismo al skyline y la música.
+   - En cuanto el cursor se mueve o interactúa, todo reaparece fluidamente.
+   ========================================================================== */
+body.zen-mode:not(.frame-mode) {
+  cursor: none;
+}
+
+body.zen-mode:not(.frame-mode) .audio-hud,
+body.zen-mode:not(.frame-mode) .top-clock-widget,
+body.zen-mode:not(.frame-mode) .top-schedule-widget {
+  opacity: 0.12;
+  transition: opacity 1.3s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 1.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+body.zen-mode:not(.frame-mode) .audio-hud {
+  transform: translateX(-50%) translateY(6px);
+}
+
+body.zen-mode:not(.frame-mode) .top-clock-widget {
+  transform: translateX(-100%) translateY(-6px);
+}
+
+body.zen-mode:not(.frame-mode) .top-schedule-widget {
+  transform: translateY(-6px);
+}
+
+body.zen-mode:not(.frame-mode) .audio-hud:hover,
+body.zen-mode:not(.frame-mode) .top-clock-widget:hover,
+body.zen-mode:not(.frame-mode) .top-schedule-widget:hover {
+  opacity: 1;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+body.zen-mode:not(.frame-mode) .audio-hud:hover {
+  transform: translateX(-50%) translateY(0);
+}
+
+body.zen-mode:not(.frame-mode) .top-clock-widget:hover {
+  transform: translateX(-100%) translateY(0);
+}
+
+body.zen-mode:not(.frame-mode) .top-schedule-widget:hover {
+  transform: translateY(0);
+}
+
+/* ==========================================================================
+   Modo "Cuadro Digital" (Atajo F / Pantalla Completa Limpia)
+   - Pantalla limpia: oculta HUD inferior (pista y controles) y parrilla 24h.
+   - Reloj y fecha centrados majestuosamente en la pantalla.
+   ========================================================================== */
+body.frame-mode {
+  cursor: none;
+}
+
+body.frame-mode.mouse-active {
+  cursor: default;
+}
+
+body.frame-mode .top-schedule-widget {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateY(-24px) scale(0.95);
+  transition: opacity 0.45s ease, transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+body.frame-mode .audio-hud {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateX(-50%) translateY(40px) scale(0.95);
+  transition: opacity 0.45s ease, transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+body.frame-mode .wallpaper-vignette {
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.22) 0%, rgba(0, 0, 0, 0.7) 100%);
+  transition: background 0.8s ease;
+}
+
+body.frame-mode .top-clock-widget {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  align-items: center;
+  text-align: center;
+  opacity: 1 !important;
+  filter: drop-shadow(0 16px 45px rgba(0, 0, 0, 0.85));
+}
+
+body.frame-mode .clock-time {
+  font-size: 7.2rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  justify-content: center;
+  transition: font-size 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+body.frame-mode .clock-date {
+  font-size: 2.1rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.88);
+  margin-top: 0.85rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  justify-content: center;
+  transition: font-size 0.75s cubic-bezier(0.16, 1, 0.3, 1), margin-top 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (max-width: 1024px) {
+  body.frame-mode .clock-time {
+    font-size: 5.4rem;
+  }
+  body.frame-mode .clock-date {
+    font-size: 1.6rem;
+  }
+}
+
+@media (max-width: 640px) {
+  body.frame-mode .clock-time {
+    font-size: 3.8rem;
+  }
+  body.frame-mode .clock-date {
+    font-size: 1.2rem;
+  }
+}
