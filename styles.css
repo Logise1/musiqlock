@@ -138,21 +138,25 @@ html, body {
 
 /* Animación de rodillo vertical limpia: sin fondos, bordes ni cajas */
 .roll-slot {
-  display: inline-block;
+  display: inline-flex;
   position: relative;
   overflow: hidden;
-  height: 1.15em;
-  line-height: 1.15em;
+  height: 1.3em;
+  line-height: 1.3em;
   vertical-align: middle;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
+  padding: 0 0.02em;
+  box-sizing: content-box;
 }
 
 .clock-time .roll-slot.is-digit {
-  width: 0.65em;
-  min-width: 0.65em;
+  width: 0.68em;
+  min-width: 0.68em;
 }
 
 .clock-time .roll-slot.is-sep {
@@ -162,8 +166,8 @@ html, body {
 }
 
 .clock-date .roll-slot.is-digit {
-  width: 0.62em;
-  min-width: 0.62em;
+  width: 0.64em;
+  min-width: 0.64em;
 }
 
 .clock-date .roll-slot.is-space {
@@ -176,16 +180,19 @@ html, body {
 }
 
 .roll-unit {
-  display: block;
-  width: 100%;
-  height: 100%;
-  line-height: 1.15em;
-  text-align: center;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  height: 100% !important;
+  line-height: inherit !important;
+  text-align: center !important;
   will-change: transform;
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
   text-shadow: none !important;
+  box-sizing: border-box !important;
 }
 
 .roll-unit.roll-current {
@@ -198,6 +205,7 @@ html, body {
   top: 0;
   left: 0;
   width: 100%;
+  height: 100%;
   transform: translateY(100%);
 }
 
@@ -882,18 +890,18 @@ html, body {
    Responsive Adaptations
    ========================================================================== */
 @media (max-width: 900px) {
-  .top-schedule-widget {
+  body:not(.frame-mode) .top-schedule-widget {
     top: 1.5rem;
     left: 1.5rem;
   }
-  .top-clock-widget {
+  body:not(.frame-mode) .top-clock-widget {
     top: 1.5rem;
     right: 1.5rem;
   }
-  .clock-time {
+  body:not(.frame-mode) .clock-time {
     font-size: 2.8rem;
   }
-  .clock-date {
+  body:not(.frame-mode) .clock-date {
     font-size: 1.15rem;
   }
   .audio-hud {
@@ -988,48 +996,176 @@ body.frame-mode .wallpaper-vignette {
 }
 
 body.frame-mode .top-clock-widget {
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  align-items: center;
-  text-align: center;
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: translate(-50%, -50%) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  width: max-content !important;
+  max-width: 96vw !important;
+  margin: 0 !important;
+  padding: 0.5rem 1rem !important;
   opacity: 1 !important;
-  filter: drop-shadow(0 16px 45px rgba(0, 0, 0, 0.85));
+  pointer-events: none !important;
+  z-index: 30 !important;
+  filter: none !important;
+  overflow: visible !important;
+  transition: top 0.75s cubic-bezier(0.16, 1, 0.3, 1),
+              left 0.75s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-body.frame-mode .clock-time {
-  font-size: 7.2rem;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  justify-content: center;
-  transition: font-size 0.75s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
+/* Modo Grande: Ocultar fecha para que SOLO salgan hora y minutos */
 body.frame-mode .clock-date {
-  font-size: 2.1rem;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.88);
-  margin-top: 0.85rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  justify-content: center;
-  transition: font-size 0.75s cubic-bezier(0.16, 1, 0.3, 1), margin-top 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+  display: none !important;
+}
+
+/* Modo Grande: Reloj gigante con cristal auténtico, alta translucidez y bordes biselados nítidos */
+body.frame-mode .clock-time {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  margin: 0 auto !important;
+  padding: 0.25em 0.8em !important;
+  width: auto !important;
+  max-width: 95vw !important;
+  font-family: var(--font-sans);
+  font-size: clamp(5.5rem, min(19vw, 27vh), 16.5rem) !important;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1;
+  white-space: nowrap;
+  font-variant-numeric: normal !important;
+  font-feature-settings: normal !important;
+  overflow: visible !important;
+  box-sizing: border-box !important;
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.95))
+          drop-shadow(0 -2px 0.5px rgba(255, 255, 255, 0.95))
+          drop-shadow(-1.5px 0 0.5px rgba(255, 255, 255, 0.8))
+          drop-shadow(1.5px 2px 1px rgba(0, 0, 0, 0.7))
+          drop-shadow(0 14px 28px rgba(0, 0, 0, 0.85)) !important;
+  transition: font-size 0.75s cubic-bezier(0.16, 1, 0.3, 1),
+              filter 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+body.frame-mode .clock-time .roll-slot {
+  height: 1.35em !important;
+  line-height: 1.35em !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  overflow: hidden !important;
+  padding: 0 0.05em !important;
+  box-sizing: content-box !important;
+  vertical-align: middle !important;
+}
+
+body.frame-mode .clock-time .roll-slot.is-digit {
+  width: 0.72em !important;
+  min-width: 0.72em !important;
+}
+
+body.frame-mode .clock-time .roll-slot.is-sep {
+  width: 0.38em !important;
+  min-width: 0.38em !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  animation: glassColonPulse 3s ease-in-out infinite;
+}
+
+/* Tipografía de cristal puro: bordes definidos, cuerpo translúcido y haz especular nítido */
+body.frame-mode .clock-time .roll-unit {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  height: 100% !important;
+  line-height: 1.35em !important;
+  box-sizing: border-box !important;
+  background: linear-gradient(
+    130deg,
+    rgba(255, 255, 255, 0.70) 0%,
+    rgba(255, 255, 255, 0.22) 18%,
+    rgba(255, 255, 255, 0.10) 42%,
+    rgba(255, 255, 255, 0.92) 50%,
+    rgba(255, 255, 255, 0.14) 58%,
+    rgba(255, 255, 255, 0.10) 78%,
+    rgba(255, 255, 255, 0.40) 92%,
+    rgba(255, 255, 255, 0.75) 100%
+  ) !important;
+  background-size: 260% 260% !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  color: transparent !important;
+  text-shadow: none !important;
+  animation: glassSpecularSweep 14s ease-in-out infinite alternate !important;
+}
+
+@keyframes glassSpecularSweep {
+  0% {
+    background-position: 0% 15%;
+  }
+  50% {
+    background-position: 100% 85%;
+  }
+  100% {
+    background-position: 0% 15%;
+  }
+}
+
+@keyframes glassColonPulse {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(0.98);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.02);
+  }
 }
 
 @media (max-width: 1024px) {
-  body.frame-mode .clock-time {
-    font-size: 5.4rem;
+  body.frame-mode .top-clock-widget {
+    top: 50% !important;
+    left: 50% !important;
+    right: auto !important;
+    bottom: auto !important;
+    transform: translate(-50%, -50%) !important;
   }
-  body.frame-mode .clock-date {
-    font-size: 1.6rem;
+  body.frame-mode .clock-time {
+    font-size: clamp(4.5rem, min(19vw, 24vh), 12rem) !important;
+    padding: 0.2em 0.5em !important;
+    filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.9))
+            drop-shadow(0 -1.5px 0.5px rgba(255, 255, 255, 0.9))
+            drop-shadow(1px 1.5px 1px rgba(0, 0, 0, 0.7))
+            drop-shadow(0 12px 24px rgba(0, 0, 0, 0.85)) !important;
   }
 }
 
 @media (max-width: 640px) {
-  body.frame-mode .clock-time {
-    font-size: 3.8rem;
+  body.frame-mode .top-clock-widget {
+    top: 50% !important;
+    left: 50% !important;
+    right: auto !important;
+    bottom: auto !important;
+    transform: translate(-50%, -50%) !important;
   }
-  body.frame-mode .clock-date {
-    font-size: 1.2rem;
+  body.frame-mode .clock-time {
+    font-size: clamp(3.2rem, min(18vw, 20vh), 7.5rem) !important;
+    padding: 0.2em 0.3em !important;
+    filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.85))
+            drop-shadow(0 -1px 0.5px rgba(255, 255, 255, 0.85))
+            drop-shadow(1px 1px 1px rgba(0, 0, 0, 0.7))
+            drop-shadow(0 8px 18px rgba(0, 0, 0, 0.85)) !important;
   }
 }

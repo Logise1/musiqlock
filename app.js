@@ -137,6 +137,14 @@
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
   }
 
+  // Format seconds to HH:MM (solo hora y minutos para el modo grande)
+  function formatTimeHHMM(seconds) {
+    const s = Math.floor(seconds) % 86400;
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  }
+
   // Format seconds to M:SS
   function formatTimeMSS(seconds) {
     const s = Math.max(0, Math.floor(seconds));
@@ -408,18 +416,21 @@
     const secFloor = Math.floor(sec);
 
     // Master Clock & Date con animación vertical (sube número y por debajo sube el siguiente)
-    const clockStr = formatTimeHHMMSS(secFloor);
+    // En modo grande (frame-mode), solo se muestran hora y minutos (HH:MM)
+    const clockStr = isFrameMode ? formatTimeHHMM(secFloor) : formatTimeHHMMSS(secFloor);
     if (clockStr !== lastClockValue) {
       lastClockValue = clockStr;
       if (masterClock) updateRollingText(masterClock, clockStr);
     }
 
-    const now = new Date();
-    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    const dateStr = `${now.getDate()} ${months[now.getMonth()]}`;
-    if (dateStr !== lastDateValue) {
-      lastDateValue = dateStr;
-      if (masterDate) updateRollingText(masterDate, dateStr);
+    if (!isFrameMode) {
+      const now = new Date();
+      const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      const dateStr = `${now.getDate()} ${months[now.getMonth()]}`;
+      if (dateStr !== lastDateValue) {
+        lastDateValue = dateStr;
+        if (masterDate) updateRollingText(masterDate, dateStr);
+      }
     }
 
     // Current Track & Phase
@@ -928,6 +939,8 @@
     }
 
     document.body.classList.toggle('frame-mode', isFrameMode);
+    lastClockValue = '';
+    lastDateValue = '';
 
     if (isFrameMode) {
       if (scheduleModal && scheduleModal.classList.contains('active')) {
@@ -956,6 +969,8 @@
     if (!document.fullscreenElement && isFrameMode) {
       isFrameMode = false;
       document.body.classList.remove('frame-mode');
+      lastClockValue = '';
+      lastDateValue = '';
       showFrameToast('Modo Estándar restaurado');
     }
   });
@@ -1331,6 +1346,10 @@
     initSchedule();
     setPlaybackState(false);
     requestAnimationFrame(tick);
+
+    if (new URLSearchParams(window.location.search).has('frame')) {
+      toggleFrameMode(true);
+    }
 
     console.log(
       '%c📻 MusiqLock Radio 24/7 Sincronizada con Vídeos de Ciudades\n' +
