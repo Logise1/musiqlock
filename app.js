@@ -27,75 +27,76 @@
   // Auto-hide inmersivo
   let inactivityTimer = null;
 
-  // Vídeos y pósters de ciudades dinámicos por fase circadiana (Sin logos ni marcas de agua)
-  const PHASE_VIDEOS = {
+  // Fotos de ciudades (skilines) — rotan cada 10s
+  const PHASE_PHOTOS = {
     'madrugada': {
       id: 'madrugada',
-      video: 'assets/videos/madrugada.mp4',
-      poster: 'assets/videos/madrugada.jpg',
+      image: 'assets/videos/madrugada.jpg',
       city: 'Nueva York',
       subtitle: 'Bajo Manhattan Nocturno'
     },
     'despertar': {
       id: 'despertar',
-      video: 'assets/videos/despertar.mp4',
-      poster: 'assets/videos/despertar.jpg',
+      image: 'assets/videos/despertar.jpg',
       city: 'Tokio',
       subtitle: 'Amanecer en Tokyo Skytree'
     },
     'enfoque': {
       id: 'enfoque',
-      video: 'assets/videos/enfoque.mp4',
-      poster: 'assets/videos/enfoque.jpg',
+      image: 'assets/videos/enfoque.jpg',
       city: 'Nueva York',
       subtitle: 'Midtown & Empire State'
     },
     'sobremesa': {
       id: 'sobremesa',
-      video: 'assets/videos/sobremesa.mp4',
-      poster: 'assets/videos/sobremesa.jpg',
+      image: 'assets/videos/sobremesa.jpg',
       city: 'Singapur',
       subtitle: 'Marina Bay Sands'
     },
     'dinamismo': {
       id: 'dinamismo',
-      video: 'assets/videos/dinamismo.mp4',
-      poster: 'assets/videos/dinamismo.jpg',
+      image: 'assets/videos/dinamismo.jpg',
       city: 'Nueva York',
       subtitle: 'Atardecer Dorado'
     },
     'pulso': {
       id: 'pulso',
-      video: 'assets/videos/pulso.mp4',
-      poster: 'assets/videos/pulso.jpg',
+      image: 'assets/videos/pulso.jpg',
       city: 'Tokio',
       subtitle: 'Luces de Neón & Autopistas'
     },
     'descenso': {
       id: 'descenso',
-      video: 'assets/videos/descenso.mp4',
-      poster: 'assets/videos/descenso.jpg',
+      image: 'assets/videos/descenso.jpg',
       city: 'Nueva York',
       subtitle: 'Noche Urbana'
     },
     'cierre_ritual': {
       id: 'cierre_ritual',
-      video: 'assets/videos/sydney.mp4',
-      poster: 'assets/videos/sydney.jpg',
+      image: 'assets/videos/sydney.jpg',
       city: 'Sídney',
       subtitle: 'Ópera y Bahía a Medianoche'
     }
   };
 
-  const CITY_KEYS = ['madrugada', 'despertar', 'enfoque', 'sobremesa', 'dinamismo', 'pulso', 'descenso', 'cierre_ritual'];
+  const EXTRA_PHOTOS = [
+    { id: 'sunrise', image: 'assets/sunrise.jpg', city: 'Amanecer', subtitle: 'Primera luz' },
+    { id: 'day', image: 'assets/day.jpg', city: 'Día', subtitle: 'Skyline diurno' },
+    { id: 'sunset', image: 'assets/sunset.jpg', city: 'Atardecer', subtitle: 'Hora dorada' },
+    { id: 'night', image: 'assets/night.jpg', city: 'Noche', subtitle: 'Skyline nocturno' },
+    { id: 'night_pulse', image: 'assets/night_pulse.jpg', city: 'Noche', subtitle: 'Pulso urbano' }
+  ];
+
+  const WALLPAPER_PHOTOS = Object.values(PHASE_PHOTOS).concat(EXTRA_PHOTOS);
+  const PHOTO_INTERVAL_MS = 10000;
   let currentCityIndex = 0;
   let manualCityOverride = false;
   let wallpaperPlaylistActive = false;
-  let wallpaperAdvanceLock = false;
+  let photoTimer = null;
   let activeBgLayer = 'A';
   let currentVideoUrl = '';
   let currentWallpaperUrl = '';
-  const isTvDevice = /SmartTV|SMART-TV|SmartTv|Tizen|Web0S|WebOS|WEBOS|VIDAA|NetCast|BRAVIA|CrKey|AFT|AppleTV|HbbTV|Opera TV|Hisense|SonyCEBrowser|Viera|PhilipsTV|Maple|Espial/i.test(navigator.userAgent || '');
+  const PHASE_VIDEOS = PHASE_PHOTOS;
 
   // DOM Elements
   const masterClock = document.getElementById('masterClock');
@@ -127,10 +128,10 @@
   const scheduleList = document.getElementById('scheduleList');
 
   const localAudio = document.getElementById('localAudio');
-  const videoLayerA = document.getElementById('videoLayerA');
-  const videoLayerB = document.getElementById('videoLayerB');
-  const wallpaperVideoA = document.getElementById('wallpaperVideoA');
-  const wallpaperVideoB = document.getElementById('wallpaperVideoB');
+  const photoLayerA = document.getElementById('photoLayerA');
+  const photoLayerB = document.getElementById('photoLayerB');
+  const wallpaperPhotoA = document.getElementById('wallpaperPhotoA');
+  const wallpaperPhotoB = document.getElementById('wallpaperPhotoB');
   streamPlayerA = document.getElementById('streamPlayerA');
   streamPlayerB = document.getElementById('streamPlayerB');
 
@@ -196,63 +197,28 @@
     return RADIO_SCHEDULE.phases.find(p => p.id === phaseId) || RADIO_SCHEDULE.phases[0];
   }
 
-  function playMedia(el) {
-    if (!el) return;
-    try {
-      el.muted = el.hasAttribute('muted') || el === wallpaperVideoA || el === wallpaperVideoB;
-      const playPromise = el.play();
-      if (playPromise && typeof playPromise.catch === 'function') {
-        playPromise.catch(() => {
-          setTimeout(() => {
-            el.play().catch(() => {});
-          }, 350);
-        });
-      }
-    } catch (e) {}
+  function getPhotoUrl(photoData) {
+    if (!photoData) return '';
+    if (typeof photoData === 'string') return photoData;
+    return photoData.image || photoData.poster || photoData.video || '';
   }
 
-  function prepareWallpaperVideo(el) {
-    if (!el) return;
-    el.muted = true;
-    el.defaultMuted = true;
-    el.autoplay = true;
-    el.loop = false;
-    el.playsInline = true;
-    el.setAttribute('playsinline', '');
-    el.setAttribute('webkit-playsinline', '');
-    el.setAttribute('x5-playsinline', '');
-    el.removeAttribute('loop');
-  }
-
-  function getActiveWallpaperVideo() {
-    if (isTvDevice) return wallpaperVideoA;
-    return activeBgLayer === 'A' ? wallpaperVideoA : wallpaperVideoB;
+  function preloadPhoto(url) {
+    if (!url) return;
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = url;
   }
 
   function playNextWallpaper() {
-    if (wallpaperAdvanceLock) return;
-    wallpaperAdvanceLock = true;
-    currentCityIndex = (currentCityIndex + 1) % CITY_KEYS.length;
-    const nextInfo = PHASE_VIDEOS[CITY_KEYS[currentCityIndex]];
-    setCityVideo(nextInfo);
-    setTimeout(() => {
-      wallpaperAdvanceLock = false;
-    }, 900);
+    if (!WALLPAPER_PHOTOS.length) return;
+    currentCityIndex = (currentCityIndex + 1) % WALLPAPER_PHOTOS.length;
+    setCityPhoto(WALLPAPER_PHOTOS[currentCityIndex]);
   }
 
-  function bindWallpaperSequence(el) {
-    if (!el || el.dataset.playlistBound === '1') return;
-    el.dataset.playlistBound = '1';
-    el.addEventListener('ended', () => {
-      if (el === getActiveWallpaperVideo()) {
-        playNextWallpaper();
-      }
-    });
-    el.addEventListener('error', () => {
-      if (el === getActiveWallpaperVideo()) {
-        playNextWallpaper();
-      }
-    });
+  function startPhotoSlideshow() {
+    clearInterval(photoTimer);
+    photoTimer = setInterval(playNextWallpaper, PHOTO_INTERVAL_MS);
   }
 
   function youtubeWatchUrl(videoId) {
@@ -284,92 +250,80 @@
     return data.url;
   }
 
-  // Transición suave de fondo panorámico en vídeo (Cross-fade)
-  function setCityVideo(videoData) {
-    if (!videoData) return;
-    const vUrl = typeof videoData === 'string' ? videoData : videoData.video;
-    const pUrl = typeof videoData === 'object' ? videoData.poster : '';
-    const cityName = typeof videoData === 'object' ? `${videoData.city} • ${videoData.subtitle}` : videoData;
-    const videoKey = typeof videoData === 'object' ? videoData.id : '';
+  // Transición suave de fondo panorámico en foto (Cross-fade)
+  function setCityPhoto(photoData) {
+    if (!photoData) return;
+    const imgUrl = getPhotoUrl(photoData);
+    const cityName = typeof photoData === 'object' ? `${photoData.city} • ${photoData.subtitle}` : photoData;
+    const photoKey = typeof photoData === 'object' ? photoData.id : '';
 
     if (cityName && locationCity) {
       locationCity.textContent = cityName;
     }
 
-    if (videoKey) {
-      const keyIndex = CITY_KEYS.indexOf(videoKey);
+    if (photoKey) {
+      const keyIndex = WALLPAPER_PHOTOS.findIndex(p => p.id === photoKey);
       if (keyIndex >= 0) currentCityIndex = keyIndex;
     }
 
-    if (vUrl === currentVideoUrl) {
-      const activeVideo = getActiveWallpaperVideo();
-      if (activeVideo && activeVideo.paused) {
-        playMedia(activeVideo);
-      }
-      return;
-    }
-    currentVideoUrl = vUrl;
-    currentWallpaperUrl = vUrl;
+    if (!imgUrl || imgUrl === currentWallpaperUrl) return;
+    currentWallpaperUrl = imgUrl;
+    currentVideoUrl = imgUrl;
     wallpaperPlaylistActive = true;
 
-    if (isTvDevice || !wallpaperVideoB) {
-      if (!wallpaperVideoA) return;
-      if (pUrl) wallpaperVideoA.poster = pUrl;
-      wallpaperVideoA.src = vUrl;
-      wallpaperVideoA.load();
-      playMedia(wallpaperVideoA);
-      if (videoLayerA) videoLayerA.classList.add('active');
-      if (videoLayerB) videoLayerB.classList.remove('active');
-      if (wallpaperVideoB) {
-        try { wallpaperVideoB.pause(); wallpaperVideoB.removeAttribute('src'); wallpaperVideoB.load(); } catch (e) {}
-      }
+    if (wallpaperPhotoA && !wallpaperPhotoA.getAttribute('src')) {
+      wallpaperPhotoA.src = imgUrl;
+      wallpaperPhotoA.alt = cityName || '';
+      if (photoLayerA) photoLayerA.classList.add('active');
+      if (photoLayerB) photoLayerB.classList.remove('active');
       activeBgLayer = 'A';
+      const upcoming = WALLPAPER_PHOTOS[(currentCityIndex + 1) % WALLPAPER_PHOTOS.length];
+      preloadPhoto(getPhotoUrl(upcoming));
+      startPhotoSlideshow();
       return;
     }
 
-    const nextLayer = activeBgLayer === 'A' ? videoLayerB : videoLayerA;
-    const prevLayer = activeBgLayer === 'A' ? videoLayerA : videoLayerB;
-    const nextVideo = activeBgLayer === 'A' ? wallpaperVideoB : wallpaperVideoA;
-    const prevVideo = activeBgLayer === 'A' ? wallpaperVideoA : wallpaperVideoB;
+    const nextLayer = activeBgLayer === 'A' ? photoLayerB : photoLayerA;
+    const prevLayer = activeBgLayer === 'A' ? photoLayerA : photoLayerB;
+    const nextImg = activeBgLayer === 'A' ? wallpaperPhotoB : wallpaperPhotoA;
 
-    if (!nextLayer || !nextVideo) return;
+    if (!nextLayer || !nextImg) return;
 
-    if (pUrl) nextVideo.poster = pUrl;
-    nextVideo.src = vUrl;
-    nextVideo.load();
-    playMedia(nextVideo);
-
+    nextImg.src = imgUrl;
+    nextImg.alt = cityName || '';
     nextLayer.classList.add('active');
-    prevLayer.classList.remove('active');
+    if (prevLayer) prevLayer.classList.remove('active');
     activeBgLayer = activeBgLayer === 'A' ? 'B' : 'A';
 
-    setTimeout(() => {
-      if (prevVideo && prevLayer && !prevLayer.classList.contains('active')) {
-        try { prevVideo.pause(); } catch (e) {}
-      }
-    }, 1800);
+    const upcoming = WALLPAPER_PHOTOS[(currentCityIndex + 1) % WALLPAPER_PHOTOS.length];
+    preloadPhoto(getPhotoUrl(upcoming));
+    startPhotoSlideshow();
   }
 
-  // Compatibilidad hacia atrás para cambiar fondo/vídeo
+  function setCityVideo(photoData) {
+    setCityPhoto(photoData);
+  }
+
+  // Compatibilidad hacia atrás para cambiar fondo/foto
   function setWallpaper(url) {
     if (!url) return;
     manualCityOverride = true;
-    const match = Object.values(PHASE_VIDEOS).find(v => v.video === url || v.poster === url);
+    const match = WALLPAPER_PHOTOS.find(v => v.image === url);
     if (match) {
-      setCityVideo(match);
+      setCityPhoto(match);
     } else {
-      setCityVideo({ video: url, poster: '', city: 'Fondo Dinámico', subtitle: 'Personalizado' });
+      setCityPhoto({ image: url, city: 'Fondo Dinámico', subtitle: 'Personalizado' });
     }
   }
 
-  // Cambiar manualmente de ciudad con el botón
+  // Cambiar manualmente de foto
   function cycleCityVideo() {
     manualCityOverride = true;
-    currentCityIndex = (currentCityIndex + 1) % CITY_KEYS.length;
-    const key = CITY_KEYS[currentCityIndex];
-    const vidInfo = PHASE_VIDEOS[key];
-    setCityVideo(vidInfo);
-    console.log(`%c🌆 Ciudad cambiada a: ${vidInfo.city} (${vidInfo.subtitle})`, 'color: #38bdf8; font-weight: bold;');
+    playNextWallpaper();
+    const info = WALLPAPER_PHOTOS[currentCityIndex];
+    if (info) {
+      console.log(`%c🌆 Foto cambiada a: ${info.city} (${info.subtitle})`, 'color: #38bdf8; font-weight: bold;');
+    }
   }
 
   // Apply phase styling & wallpaper
@@ -381,8 +335,8 @@
     if (phaseName) phaseName.textContent = phase.name;
 
     if (!manualCityOverride && !wallpaperPlaylistActive) {
-      const vidInfo = PHASE_VIDEOS[phase.id] || PHASE_VIDEOS['dinamismo'];
-      setCityVideo(vidInfo);
+      const photoInfo = PHASE_PHOTOS[phase.id] || PHASE_PHOTOS['dinamismo'];
+      setCityPhoto(photoInfo);
     }
   }
 
@@ -395,9 +349,9 @@
       if (totalTimeLabel) totalTimeLabel.textContent = formatTimeMSS(track.duration);
       updateActiveScheduleItem(track.id);
 
-      // Si es el ritual de medianoche, asegurar el vídeo de Sídney
+      // Si es el ritual de medianoche, asegurar la foto de Sídney
       if (track.isRitual) {
-        setCityVideo(PHASE_VIDEOS['cierre_ritual']);
+        setCityPhoto(PHASE_PHOTOS['cierre_ritual']);
       }
 
       // Si cambió de pista mientras se está reproduciendo, iniciar con cross-fade si está precargada
@@ -873,14 +827,10 @@
   }
 
   function resumeWallpaperPlayback() {
-    const active = getActiveWallpaperVideo();
-    if (active && active.ended) {
-      playNextWallpaper();
-      return;
+    if (!currentWallpaperUrl && WALLPAPER_PHOTOS.length) {
+      setCityPhoto(WALLPAPER_PHOTOS[currentCityIndex] || WALLPAPER_PHOTOS[0]);
     }
-    [wallpaperVideoA, wallpaperVideoB].forEach((el) => {
-      if (el && !el.ended) playMedia(el);
-    });
+    startPhotoSlideshow();
   }
 
   function applyStreamVolume() {
@@ -1314,18 +1264,18 @@
       return;
     }
     const query = String(cityNameOrKey).toLowerCase().trim();
-    const keyMatch = Object.keys(PHASE_VIDEOS).find(k => k.toLowerCase() === query);
+    const keyMatch = WALLPAPER_PHOTOS.find(p => p.id.toLowerCase() === query);
     if (keyMatch) {
       manualCityOverride = true;
-      setCityVideo(PHASE_VIDEOS[keyMatch]);
-      return PHASE_VIDEOS[keyMatch];
+      setCityPhoto(keyMatch);
+      return keyMatch;
     }
-    const cityMatch = Object.values(PHASE_VIDEOS).find(v => 
+    const cityMatch = WALLPAPER_PHOTOS.find(v =>
       v.city.toLowerCase().includes(query) || v.subtitle.toLowerCase().includes(query)
     );
     if (cityMatch) {
       manualCityOverride = true;
-      setCityVideo(cityMatch);
+      setCityPhoto(cityMatch);
       return cityMatch;
     }
     console.warn(`Ciudad "${cityNameOrKey}" no encontrada. Usa ciudades() para ver la lista.`);
@@ -1338,20 +1288,20 @@
     const track = getTrackForSecond(sec);
     const phase = getPhaseById(track.phaseId);
     if (track.isRitual) {
-      setCityVideo(PHASE_VIDEOS['cierre_ritual']);
+      setCityPhoto(PHASE_PHOTOS['cierre_ritual']);
     } else {
-      setCityVideo(PHASE_VIDEOS[phase.id] || PHASE_VIDEOS['dinamismo']);
+      setCityPhoto(PHASE_PHOTOS[phase.id] || PHASE_PHOTOS['dinamismo']);
     }
-    console.log('%c⚡ Ciudad restaurada a modo sincronizado con la fase', 'color: #10b981; font-weight: bold;');
+    console.log('%c⚡ Foto restaurada a la fase actual; el carrusel sigue cada 10s', 'color: #10b981; font-weight: bold;');
   }
 
   function listCities() {
-    console.log('%c🌆 Ciudades y Vídeos Panorámicos Disponibles:', 'color: #f59e0b; font-weight: bold; font-size: 13px;');
-    console.table(Object.values(PHASE_VIDEOS).map(v => ({
-      Fase: v.id,
+    console.log('%c🌆 Fotos panorámicas disponibles:', 'color: #f59e0b; font-weight: bold; font-size: 13px;');
+    console.table(WALLPAPER_PHOTOS.map(v => ({
+      Id: v.id,
       Ciudad: v.city,
       Panorámica: v.subtitle,
-      Ruta: v.video
+      Ruta: v.image
     })));
     console.log('Usa setCity("tokio"), setCity("sidney"), setCity("singapur") o setCity("nueva york") para cambiar.');
   }
@@ -1385,10 +1335,9 @@
   // Initialize Station
   function init() {
     setupStreamPlayers();
-    prepareWallpaperVideo(wallpaperVideoA);
-    prepareWallpaperVideo(wallpaperVideoB);
-    bindWallpaperSequence(wallpaperVideoA);
-    bindWallpaperSequence(wallpaperVideoB);
+    WALLPAPER_PHOTOS.forEach((photo, index) => {
+      if (index < 3) preloadPhoto(photo.image);
+    });
 
     // Preload sydney.mp3 y gestionar finalización limpia hacia La Madrugada
     if (localAudio) {
@@ -1412,32 +1361,18 @@
       btnCycleCity.addEventListener('click', cycleCityVideo);
     }
 
-    // Cargar el primer vídeo de la fase actual y encadenar el resto al terminar
+    // Primera foto según la fase; después rota todas cada 10s
     const initialSec = getBroadcastSecond();
     const initialTrack = getTrackForSecond(initialSec);
     const initialPhase = getPhaseById(initialTrack.phaseId);
-    const initialVid = initialTrack.isRitual ? PHASE_VIDEOS['cierre_ritual'] : (PHASE_VIDEOS[initialPhase.id] || PHASE_VIDEOS['dinamismo']);
-    setCityVideo(initialVid);
+    const initialPhoto = initialTrack.isRitual ? PHASE_PHOTOS['cierre_ritual'] : (PHASE_PHOTOS[initialPhase.id] || PHASE_PHOTOS['dinamismo']);
+    setCityPhoto(initialPhoto);
 
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) {
         resumeWallpaperPlayback();
       }
     });
-    ['click', 'touchstart', 'keydown'].forEach((evt) => {
-      window.addEventListener(evt, resumeWallpaperPlayback, { passive: true });
-    });
-    setInterval(() => {
-      const activeVideo = getActiveWallpaperVideo();
-      if (!activeVideo || !activeVideo.getAttribute('src')) return;
-      if (activeVideo.ended) {
-        playNextWallpaper();
-        return;
-      }
-      if (activeVideo.paused) {
-        playMedia(activeVideo);
-      }
-    }, 5000);
 
     updateVolumeSliderFill();
     initSchedule();
@@ -1449,13 +1384,13 @@
     }
 
     console.log(
-      '%c📻 MusiqLock Radio 24/7 Sincronizada con Vídeos de Ciudades\n' +
+      '%c📻 MusiqLock Radio 24/7 Sincronizada con Fotos de Ciudades\n' +
       '%cComandos de consola disponibles:\n' +
       '  • sthora("23:57:14") o sthora(23, 57, 14)   -> Cambia y sincroniza música y reloj exacto\n' +
       '  • setHora("14:30:00") o setTime(14, 30, 0)  -> Sincronizar a cualquier hora/minuto/segundo\n' +
-      '  • setCity("tokio") o cambiarCiudad("sydney") -> Cambiar skyline en vídeo\n' +
-      '  • ciudades()                                -> Ver todas las ciudades disponibles\n' +
-      '  • resetCity()                               -> Ciudad automática según la hora\n' +
+      '  • setCity("tokio") o cambiarCiudad("sydney") -> Cambiar foto de skyline\n' +
+      '  • ciudades()                                -> Ver todas las fotos disponibles\n' +
+      '  • resetCity()                               -> Foto de la fase actual; el carrusel sigue\n' +
       '  • resetTime() o horaReal()                  -> Volver al directo en tiempo real\n' +
       '  • getTime() o verHora()                     -> Ver estado, canción y hora actual',
       'color: #6366f1; font-weight: bold; font-size: 14px;',
