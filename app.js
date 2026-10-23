@@ -8,10 +8,8 @@
   'use strict';
 
   // Application State
-  let playerA = null;
-  let playerB = null;
-  let isPlayerAReady = false;
-  let isPlayerBReady = false;
+  let streamPlayerA = null;
+  let streamPlayerB = null;
   let activePlayerKey = 'A';
   let isPlaying = false;
   let isMuted = false;
@@ -22,6 +20,9 @@
   let isCrossFading = false;
   let crossFadeInterval = null;
   let pendingPlay = false;
+  let streamLoadToken = 0;
+  const streamCache = Object.create(null);
+  const STREAM_API = 'https://ytmp.arielcapdevila.com/api/stream';
 
   // Auto-hide inmersivo
   let inactivityTimer = null;
@@ -86,12 +87,15 @@
     }
   };
 
-  const CITY_KEYS = ['despertar', 'enfoque', 'sobremesa', 'dinamismo', 'pulso', 'madrugada', 'cierre_ritual'];
+  const CITY_KEYS = ['madrugada', 'despertar', 'enfoque', 'sobremesa', 'dinamismo', 'pulso', 'descenso', 'cierre_ritual'];
   let currentCityIndex = 0;
   let manualCityOverride = false;
+  let wallpaperPlaylistActive = false;
+  let wallpaperAdvanceLock = false;
   let activeBgLayer = 'A';
   let currentVideoUrl = '';
   let currentWallpaperUrl = '';
+  const isTvDevice = /SmartTV|SMART-TV|SmartTv|Tizen|Web0S|WebOS|WEBOS|VIDAA|NetCast|BRAVIA|CrKey|AFT|AppleTV|HbbTV|Opera TV|Hisense|SonyCEBrowser|Viera|PhilipsTV|Maple|Espial/i.test(navigator.userAgent || '');
 
   // DOM Elements
   const masterClock = document.getElementById('masterClock');
@@ -127,6 +131,8 @@
   const videoLayerB = document.getElementById('videoLayerB');
   const wallpaperVideoA = document.getElementById('wallpaperVideoA');
   const wallpaperVideoB = document.getElementById('wallpaperVideoB');
+  streamPlayerA = document.getElementById('streamPlayerA');
+  streamPlayerB = document.getElementById('streamPlayerB');
 
   // Format seconds to HH:MM:SS
   function formatTimeHHMMSS(seconds) {
@@ -190,20 +196,136 @@
     return RADIO_SCHEDULE.phases.find(p => p.id === phaseId) || RADIO_SCHEDULE.phases[0];
   }
 
+  function playMedia(el) {
+    if (!el) return;
+    try {
+      el.muted = el.hasAttribute('muted') || el === wallpaperVideoA || el === wallpaperVideoB;
+      const playPromise = el.play();
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch(() => {
+          setTimeout(() => {
+            el.play().catch(() => {});
+          }, 350);
+        });
+      }
+    } catch (e) {}
+  }
+
+  function prepareWallpaperVideo(el) {
+    if (!el) return;
+    el.muted = true;
+    el.defaultMuted = true;
+    el.autoplay = true;
+    el.loop = false;
+    el.playsInline = true;
+    el.setAttribute('playsinline', '');
+    el.setAttribute('webkit-playsinline', '');
+    el.setAttribute('x5-playsinline', '');
+    el.removeAttribute('loop');
+  }
+
+  function getActiveWallpaperVideo() {
+    if (isTvDevice) return wallpaperVideoA;
+    return activeBgLayer === 'A' ? wallpaperVideoA : wallpaperVideoB;
+  }
+
+  function playNextWallpaper() {
+    if (wallpaperAdvanceLock) return;
+    wallpaperAdvanceLock = true;
+    currentCityIndex = (currentCityIndex + 1) % CITY_KEYS.length;
+    const nextInfo = PHASE_VIDEOS[CITY_KEYS[currentCityIndex]];
+    setCityVideo(nextInfo);
+    setTimeout(() => {
+      wallpaperAdvanceLock = false;
+    }, 900);
+  }
+
+  function bindWallpaperSequence(el) {
+    if (!el || el.dataset.playlistBound === '1') return;
+    el.dataset.playlistBound = '1';
+    el.addEventListener('ended', () => {
+      if (el === getActiveWallpaperVideo()) {
+        playNextWallpaper();
+      }
+    });
+    el.addEventListener('error', () => {
+      if (el === getActiveWallpaperVideo()) {
+        playNextWallpaper();
+      }
+    });
+  }
+
+  function youtubeWatchUrl(videoId) {
+    return `https://www.youtube.com/watch?v=${videoId}`;
+  }
+
+  function parseStreamExpiry(streamUrl) {
+    try {
+      const expire = new URL(streamUrl).searchParams.get('expire');
+      if (expire) return Number(expire) * 1000;
+    } catch (e) {}
+    return Date.now() + 4 * 60 * 60 * 1000;
+  }
+
+  async function resolveStreamUrl(videoId) {
+    const cached = streamCache[videoId];
+    if (cached && cached.expires > Date.now() + 120000) {
+      return cached.url;
+    }
+    const apiUrl = `${STREAM_API}?url=${encodeURIComponent(youtubeWatchUrl(videoId))}&type=video`;
+    const res = await fetch(apiUrl);
+    if (!res.ok) throw new Error('Stream API ' + res.status);
+    const data = await res.json();
+    if (!data || !data.url) throw new Error('Stream API vacío');
+    streamCache[videoId] = {
+      url: data.url,
+      expires: parseStreamExpiry(data.url)
+    };
+    return data.url;
+  }
+
   // Transición suave de fondo panorámico en vídeo (Cross-fade)
   function setCityVideo(videoData) {
     if (!videoData) return;
     const vUrl = typeof videoData === 'string' ? videoData : videoData.video;
     const pUrl = typeof videoData === 'object' ? videoData.poster : '';
     const cityName = typeof videoData === 'object' ? `${videoData.city} • ${videoData.subtitle}` : videoData;
+    const videoKey = typeof videoData === 'object' ? videoData.id : '';
 
     if (cityName && locationCity) {
       locationCity.textContent = cityName;
     }
 
-    if (vUrl === currentVideoUrl) return;
+    if (videoKey) {
+      const keyIndex = CITY_KEYS.indexOf(videoKey);
+      if (keyIndex >= 0) currentCityIndex = keyIndex;
+    }
+
+    if (vUrl === currentVideoUrl) {
+      const activeVideo = getActiveWallpaperVideo();
+      if (activeVideo && activeVideo.paused) {
+        playMedia(activeVideo);
+      }
+      return;
+    }
     currentVideoUrl = vUrl;
     currentWallpaperUrl = vUrl;
+    wallpaperPlaylistActive = true;
+
+    if (isTvDevice || !wallpaperVideoB) {
+      if (!wallpaperVideoA) return;
+      if (pUrl) wallpaperVideoA.poster = pUrl;
+      wallpaperVideoA.src = vUrl;
+      wallpaperVideoA.load();
+      playMedia(wallpaperVideoA);
+      if (videoLayerA) videoLayerA.classList.add('active');
+      if (videoLayerB) videoLayerB.classList.remove('active');
+      if (wallpaperVideoB) {
+        try { wallpaperVideoB.pause(); wallpaperVideoB.removeAttribute('src'); wallpaperVideoB.load(); } catch (e) {}
+      }
+      activeBgLayer = 'A';
+      return;
+    }
 
     const nextLayer = activeBgLayer === 'A' ? videoLayerB : videoLayerA;
     const prevLayer = activeBgLayer === 'A' ? videoLayerA : videoLayerB;
@@ -215,10 +337,7 @@
     if (pUrl) nextVideo.poster = pUrl;
     nextVideo.src = vUrl;
     nextVideo.load();
-    const playPromise = nextVideo.play();
-    if (playPromise !== undefined) {
-      playPromise.catch(() => {});
-    }
+    playMedia(nextVideo);
 
     nextLayer.classList.add('active');
     prevLayer.classList.remove('active');
@@ -228,7 +347,7 @@
       if (prevVideo && prevLayer && !prevLayer.classList.contains('active')) {
         try { prevVideo.pause(); } catch (e) {}
       }
-    }, 2000);
+    }, 1800);
   }
 
   // Compatibilidad hacia atrás para cambiar fondo/vídeo
@@ -261,7 +380,7 @@
     document.body.className = `phase-${phase.id}`;
     if (phaseName) phaseName.textContent = phase.name;
 
-    if (!manualCityOverride) {
+    if (!manualCityOverride && !wallpaperPlaylistActive) {
       const vidInfo = PHASE_VIDEOS[phase.id] || PHASE_VIDEOS['dinamismo'];
       setCityVideo(vidInfo);
     }
@@ -446,24 +565,13 @@
     offset = Math.max(0, offset);
     applyTrack(track, offset);
 
-    // Precarga de la siguiente pista de YouTube (cuando quedan <= 7s)
+    // Precarga de la siguiente pista (cuando quedan <= 12s)
     if (isPlaying && !track.isLocalAudio && !isCrossFading) {
       const remainingSec = track.duration - offset;
-      if (remainingSec <= 7 && remainingSec > 1) {
+      if (remainingSec <= 12 && remainingSec > 1) {
         const nextTrack = getTrackForSecond(track.endSec + 0.5);
         if (nextTrack && !nextTrack.isLocalAudio && preloadedVideoId !== nextTrack.videoId) {
-          const inactiveP = activePlayerKey === 'A' ? playerB : playerA;
-          const inactiveReady = activePlayerKey === 'A' ? isPlayerBReady : isPlayerAReady;
-          if (inactiveP && inactiveReady) {
-            preloadedVideoId = nextTrack.videoId;
-            try {
-              inactiveP.setVolume(0);
-              inactiveP.loadVideoById({ videoId: nextTrack.videoId, startSeconds: 0 });
-              inactiveP.playVideo();
-            } catch (e) {
-              console.warn('Preload failed', e);
-            }
-          }
+          preloadStreamTrack(nextTrack);
         }
       }
     }
@@ -500,15 +608,39 @@
 
   // Funciones de control de reproductor dual (Player A & Player B)
   function getActivePlayer() {
-    return activePlayerKey === 'A' ? playerA : playerB;
+    return activePlayerKey === 'A' ? streamPlayerA : streamPlayerB;
   }
 
   function getInactivePlayer() {
-    return activePlayerKey === 'A' ? playerB : playerA;
+    return activePlayerKey === 'A' ? streamPlayerB : streamPlayerA;
   }
 
   function isCurrentPlayerReady() {
-    return activePlayerKey === 'A' ? isPlayerAReady : isPlayerBReady;
+    return !!getActivePlayer();
+  }
+
+  function pauseStreamPlayer(el) {
+    if (!el) return;
+    try {
+      el.pause();
+      el.volume = 0;
+    } catch (e) {}
+  }
+
+  function seekMedia(el, targetTime) {
+    if (!el) return;
+    const duration = el.duration;
+    const safeTime = Number.isFinite(duration) && duration > 0
+      ? Math.max(0, Math.min(targetTime, duration - 0.25))
+      : Math.max(0, targetTime);
+    const apply = () => {
+      try { el.currentTime = safeTime; } catch (e) {}
+    };
+    if (el.readyState >= 1) {
+      apply();
+    } else {
+      el.addEventListener('loadedmetadata', apply, { once: true });
+    }
   }
 
   // Curva de Atenuación Perceptual (Ley de Stevens ~ x^2.2 - Audio Taper)
@@ -536,18 +668,10 @@
   function performCrossFade(incomingTrack) {
     const activeP = getActivePlayer();
     const inactiveP = getInactivePlayer();
-    const targetVol = getCurrentAudioGain().yt;
-    const inactiveReady = activePlayerKey === 'A' ? isPlayerBReady : isPlayerAReady;
+    const targetVol = getCurrentAudioGain().html5;
 
-    if (!inactiveP || !inactiveReady) {
-      // Si el reproductor inactivo no está listo, reproducir directamente en el activo
-      if (activeP) {
-        try {
-          activeP.loadVideoById({ videoId: incomingTrack.videoId, startSeconds: 0 });
-          activeP.playVideo();
-          if (!isMuted) activeP.setVolume(targetVol);
-        } catch (e) {}
-      }
+    if (!inactiveP || inactiveP.dataset.videoId !== incomingTrack.videoId) {
+      syncActiveAudio(incomingTrack, 0, true);
       return;
     }
 
@@ -556,8 +680,9 @@
     const startTime = performance.now();
 
     try {
-      inactiveP.setVolume(0);
-      inactiveP.playVideo();
+      inactiveP.muted = isMuted;
+      inactiveP.volume = 0;
+      inactiveP.play().catch(() => {});
     } catch (e) {}
 
     clearInterval(crossFadeInterval);
@@ -566,21 +691,16 @@
       const progress = Math.min(1, elapsed / fadeDurationMs);
 
       // Curva Equal-Power (seno/coseno): mantiene la energía acústica total sin caída en el centro
-      const inVol = Math.round(targetVol * Math.sin(progress * (Math.PI / 2)));
-      const outVol = Math.round(targetVol * Math.cos(progress * (Math.PI / 2)));
+      const inVol = targetVol * Math.sin(progress * (Math.PI / 2));
+      const outVol = targetVol * Math.cos(progress * (Math.PI / 2));
 
-      try { inactiveP.setVolume(inVol); } catch (e) {}
-      try { activeP.setVolume(outVol); } catch (e) {}
+      try { inactiveP.volume = inVol; } catch (e) {}
+      try { activeP.volume = outVol; } catch (e) {}
 
       if (progress >= 1) {
         clearInterval(crossFadeInterval);
-        try {
-          activeP.pauseVideo();
-          activeP.setVolume(0);
-        } catch (e) {}
-        try {
-          inactiveP.setVolume(targetVol);
-        } catch (e) {}
+        pauseStreamPlayer(activeP);
+        try { inactiveP.volume = targetVol; } catch (e) {}
         activePlayerKey = activePlayerKey === 'A' ? 'B' : 'A';
         preloadedVideoId = null;
         isCrossFading = false;
@@ -588,18 +708,80 @@
     }, 50);
   }
 
+  async function preloadStreamTrack(track) {
+    const inactiveP = getInactivePlayer();
+    if (!inactiveP || !track || !track.videoId) return;
+    preloadedVideoId = track.videoId;
+    try {
+      const url = await resolveStreamUrl(track.videoId);
+      if (preloadedVideoId !== track.videoId) return;
+      inactiveP.volume = 0;
+      inactiveP.muted = true;
+      inactiveP.src = url;
+      inactiveP.dataset.videoId = track.videoId;
+      inactiveP.load();
+      const onMeta = () => {
+        seekMedia(inactiveP, 0);
+        if (isPlaying) {
+          inactiveP.play().catch(() => {});
+        }
+      };
+      if (inactiveP.readyState >= 1) onMeta();
+      else inactiveP.addEventListener('loadedmetadata', onMeta, { once: true });
+    } catch (e) {
+      preloadedVideoId = null;
+      console.warn('Preload failed', e);
+    }
+  }
 
+  async function loadStreamOnPlayer(player, track, offset) {
+    if (!player || !track || !track.videoId) return;
+    const token = ++streamLoadToken;
+    const targetVol = getCurrentAudioGain().html5;
+    player.dataset.videoId = track.videoId;
+    try {
+      const url = await resolveStreamUrl(track.videoId);
+      if (token !== streamLoadToken || !isPlaying) return;
+      if (!currentTrack || currentTrack.videoId !== track.videoId) return;
+      player.src = url;
+      player.dataset.videoId = track.videoId;
+      player.muted = isMuted;
+      player.volume = targetVol;
+      player.load();
+      const start = () => {
+        if (token !== streamLoadToken) return;
+        seekMedia(player, offset);
+        player.muted = isMuted;
+        player.volume = targetVol;
+        if (isPlaying) {
+          player.play().catch(e => console.warn('stream play prevented', e));
+        }
+      };
+      if (player.readyState >= 1) start();
+      else player.addEventListener('loadedmetadata', start, { once: true });
+    } catch (e) {
+      console.warn('No se pudo resolver el stream', e);
+      if (token === streamLoadToken && isPlaying) {
+        const sec = getBroadcastSecond();
+        const fallback = getTrackForSecond(sec + 20);
+        if (fallback && fallback.videoId !== track.videoId && !fallback.isLocalAudio) {
+          syncActiveAudio(fallback, 0, true);
+        }
+      }
+    }
+  }
 
-  // Synchronize either YouTube player or localAudio (sydney.mp3)
+  // Synchronize either stream player or localAudio (sydney.mp3)
   function syncActiveAudio(track, offset, forceSeek = false) {
     if (isCrossFading) return;
 
     if (track.isLocalAudio) {
-      if (playerA && isPlayerAReady) { try { playerA.pauseVideo(); } catch (e) {} }
-      if (playerB && isPlayerBReady) { try { playerB.pauseVideo(); } catch (e) {} }
+      pauseStreamPlayer(streamPlayerA);
+      pauseStreamPlayer(streamPlayerB);
 
       if (localAudio) {
         localAudio.volume = getCurrentAudioGain().html5;
+        localAudio.muted = isMuted;
         if (forceSeek) {
           seekLocalAudio(localAudio, offset);
         }
@@ -617,143 +799,62 @@
       }
 
       const activeP = getActivePlayer();
-      const ready = isCurrentPlayerReady();
-      if (!activeP || !ready || typeof activeP.getVideoData !== 'function') return;
+      if (!activeP) return;
 
-      const currentLoadedId = activeP.getVideoData()?.video_id;
-      const targetVol = getCurrentAudioGain().yt;
+      const currentLoadedId = activeP.dataset.videoId;
+      const targetVol = getCurrentAudioGain().html5;
 
       if (currentLoadedId !== track.videoId) {
-        activeP.loadVideoById({
-          videoId: track.videoId,
-          startSeconds: Math.floor(offset)
-        });
-        activeP.playVideo();
-        if (!isMuted) {
-          try { activeP.unMute(); } catch (e) {}
-          activeP.setVolume(targetVol);
-        }
+        loadStreamOnPlayer(activeP, track, offset);
         return;
       }
 
-      const playerTime = typeof activeP.getCurrentTime === 'function' ? activeP.getCurrentTime() : 0;
+      activeP.muted = isMuted;
+      activeP.volume = targetVol;
+      const playerTime = Number.isFinite(activeP.currentTime) ? activeP.currentTime : 0;
       const drift = Math.abs(playerTime - offset);
       if (forceSeek || drift > 2.5) {
-        activeP.seekTo(offset, true);
-        activeP.playVideo();
-        if (!isMuted) {
-          try { activeP.unMute(); } catch (e) {}
-          activeP.setVolume(targetVol);
-        }
+        seekMedia(activeP, offset);
+      }
+      if (isPlaying && activeP.paused) {
+        activeP.play().catch(e => console.warn('stream play prevented', e));
       }
     }
   }
 
-  // YouTube IFrame API Ready Callback (Dual Player A & B)
-  function setupYouTubePlayers() {
-    if (playerA || playerB) return;
-    if (typeof YT === 'undefined' || !YT.Player) return;
-
-    const commonVars = {
-      autoplay: 0,
-      controls: 0,
-      disablekb: 1,
-      enablejsapi: 1,
-      fs: 0,
-      iv_load_policy: 3,
-      modestbranding: 1,
-      playsinline: 1,
-      rel: 0
-    };
-
-    playerA = new YT.Player('youtubePlayerA', {
-      height: '100%',
-      width: '100%',
-      playerVars: commonVars,
-      events: {
-        onReady: () => {
-          isPlayerAReady = true;
-          if (activePlayerKey === 'A') {
-            playerA.setVolume(getCurrentAudioGain().yt);
-          }
-          if (isPlaying || pendingPlay) {
-            pendingPlay = false;
-            const sec = getBroadcastSecond();
-            const track = getTrackForSecond(sec);
-            let offset = sec - track.startSec;
-            if (track.isRitual && sec < track.startSec) {
-              offset = (86400 - track.startSec) + sec;
-            }
-            offset = Math.max(0, offset);
-            syncActiveAudio(track, offset, true);
-          }
-        },
-        onStateChange: (e) => {
-          if (activePlayerKey === 'A') {
-            if (e.data === YT.PlayerState.PLAYING) {
-              setPlaybackState(true);
-            }
-          }
-        },
-        onError: (e) => {
-          console.warn('YouTube Player A Error:', e.data);
-          if (isPlaying) {
-            const sec = getBroadcastSecond();
-            const track = getTrackForSecond(sec + 60);
-            if (playerA && track && !track.isLocalAudio) {
-              playerA.loadVideoById(track.videoId, 0);
-              playerA.playVideo();
-            }
-          }
+  function setupStreamPlayers() {
+    [streamPlayerA, streamPlayerB].forEach((player) => {
+      if (!player || player.dataset.bound === '1') return;
+      player.dataset.bound = '1';
+      player.addEventListener('playing', () => {
+        if (player === getActivePlayer() && isPlaying) {
+          setPlaybackState(true);
         }
-      }
-    });
-
-    playerB = new YT.Player('youtubePlayerB', {
-      height: '100%',
-      width: '100%',
-      playerVars: commonVars,
-      events: {
-        onReady: () => {
-          isPlayerBReady = true;
-          playerB.setVolume(0);
-          if (activePlayerKey === 'B' && (isPlaying || pendingPlay)) {
-            pendingPlay = false;
-            const sec = getBroadcastSecond();
-            const track = getTrackForSecond(sec);
-            let offset = sec - track.startSec;
-            if (track.isRitual && sec < track.startSec) {
-              offset = (86400 - track.startSec) + sec;
-            }
-            offset = Math.max(0, offset);
-            syncActiveAudio(track, offset, true);
-          }
-        },
-        onStateChange: (e) => {
-          if (activePlayerKey === 'B') {
-            if (e.data === YT.PlayerState.PLAYING) {
-              setPlaybackState(true);
-            }
-          }
-        },
-        onError: (e) => {
-          console.warn('YouTube Player B Error:', e.data);
-          if (isPlaying) {
-            const sec = getBroadcastSecond();
-            const track = getTrackForSecond(sec + 60);
-            if (playerB && track && !track.isLocalAudio) {
-              playerB.loadVideoById(track.videoId, 0);
-              playerB.playVideo();
-            }
-          }
+      });
+      player.addEventListener('error', () => {
+        const videoId = player.dataset.videoId;
+        if (!videoId || !isPlaying || player !== getActivePlayer()) return;
+        delete streamCache[videoId];
+        const retries = Number(player.dataset.retries || 0);
+        if (retries >= 2) return;
+        player.dataset.retries = String(retries + 1);
+        const sec = getBroadcastSecond();
+        const track = getTrackForSecond(sec);
+        let offset = sec - track.startSec;
+        if (track.isRitual && sec < track.startSec) {
+          offset = (86400 - track.startSec) + sec;
         }
-      }
+        offset = Math.max(0, offset);
+        if (track && track.videoId === videoId) {
+          player.dataset.videoId = '';
+          loadStreamOnPlayer(player, track, offset);
+        }
+      });
+      player.addEventListener('loadeddata', () => {
+        player.dataset.retries = '0';
+      });
     });
   }
-
-  window.onYouTubeIframeAPIReady = function () {
-    setupYouTubePlayers();
-  };
 
   function setPlaybackState(playing) {
     isPlaying = playing;
@@ -771,15 +872,40 @@
     }
   }
 
+  function resumeWallpaperPlayback() {
+    const active = getActiveWallpaperVideo();
+    if (active && active.ended) {
+      playNextWallpaper();
+      return;
+    }
+    [wallpaperVideoA, wallpaperVideoB].forEach((el) => {
+      if (el && !el.ended) playMedia(el);
+    });
+  }
+
+  function applyStreamVolume() {
+    const gain = getCurrentAudioGain();
+    if (localAudio) {
+      localAudio.muted = isMuted;
+      localAudio.volume = gain.html5;
+    }
+    const activeP = getActivePlayer();
+    if (activeP && !isCrossFading) {
+      activeP.muted = isMuted;
+      activeP.volume = gain.html5;
+    }
+  }
+
   // Tune In / Pause Toggle Button
   if (btnTuneIn) {
     btnTuneIn.addEventListener('click', () => {
+      resumeWallpaperPlayback();
       if (isPlaying) {
         pendingPlay = false;
         setPlaybackState(false);
         if (localAudio) localAudio.pause();
-        if (playerA && isPlayerAReady) { try { playerA.pauseVideo(); } catch (e) {} }
-        if (playerB && isPlayerBReady) { try { playerB.pauseVideo(); } catch (e) {} }
+        pauseStreamPlayer(streamPlayerA);
+        pauseStreamPlayer(streamPlayerB);
       } else {
         setPlaybackState(true);
         const sec = getBroadcastSecond();
@@ -793,22 +919,14 @@
         if (track.isLocalAudio) {
           if (localAudio) {
             seekLocalAudio(localAudio, offset);
+            localAudio.muted = isMuted;
             localAudio.volume = getCurrentAudioGain().html5;
             localAudio.play().catch(e => console.warn('Local play prevented', e));
           }
         } else {
           const activeP = getActivePlayer();
-          const ready = isCurrentPlayerReady();
-          if (activeP && ready) {
-            activeP.loadVideoById({
-              videoId: track.videoId,
-              startSeconds: Math.floor(offset)
-            });
-            activeP.playVideo();
-            if (!isMuted) {
-              try { activeP.unMute(); } catch (e) {}
-              activeP.setVolume(getCurrentAudioGain().yt);
-            }
+          if (activeP) {
+            syncActiveAudio(track, offset, true);
           } else {
             pendingPlay = true;
             if (btnTuneText) btnTuneText.textContent = 'Sintonizando...';
@@ -829,25 +947,14 @@
   if (volumeSlider) {
     volumeSlider.addEventListener('input', (e) => {
       const val = parseInt(e.target.value, 10);
-      const gain = getAudioVolume(val);
-      if (localAudio) {
-        localAudio.volume = isMuted ? 0 : gain.html5;
-      }
-      const activeP = getActivePlayer();
-      const ready = isCurrentPlayerReady();
-      if (activeP && ready && !isCrossFading) {
-        activeP.setVolume(isMuted ? 0 : gain.yt);
-      }
       if (val === 0) {
         isMuted = true;
         updateVolumeIcon(true);
       } else if (isMuted) {
         isMuted = false;
-        if (activeP && ready) {
-          try { activeP.unMute(); } catch (e) {}
-        }
         updateVolumeIcon(false);
       }
+      applyStreamVolume();
       updateVolumeSliderFill(val);
     });
   }
@@ -855,20 +962,7 @@
   if (btnMute) {
     btnMute.addEventListener('click', () => {
       isMuted = !isMuted;
-      if (localAudio) {
-        localAudio.muted = isMuted;
-        localAudio.volume = getCurrentAudioGain().html5;
-      }
-      const activeP = getActivePlayer();
-      const ready = isCurrentPlayerReady();
-      if (activeP && ready) {
-        if (isMuted) {
-          try { activeP.mute(); } catch (e) {}
-        } else {
-          try { activeP.unMute(); } catch (e) {}
-          activeP.setVolume(getCurrentAudioGain().yt);
-        }
-      }
+      applyStreamVolume();
       updateVolumeIcon(isMuted);
       updateVolumeSliderFill();
     });
@@ -1290,17 +1384,11 @@
 
   // Initialize Station
   function init() {
-    // Inicializar YouTube IFrame API de forma segura
-    if (typeof YT !== 'undefined' && YT.Player) {
-      setupYouTubePlayers();
-    } else if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
-      const tag = document.createElement('script');
-      tag.src = 'https://www.youtube.com/iframe_api';
-      const firstScriptTag = document.getElementsByTagName('script')[0];
-      if (firstScriptTag && firstScriptTag.parentNode) {
-        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-      }
-    }
+    setupStreamPlayers();
+    prepareWallpaperVideo(wallpaperVideoA);
+    prepareWallpaperVideo(wallpaperVideoB);
+    bindWallpaperSequence(wallpaperVideoA);
+    bindWallpaperSequence(wallpaperVideoB);
 
     // Preload sydney.mp3 y gestionar finalización limpia hacia La Madrugada
     if (localAudio) {
@@ -1324,23 +1412,32 @@
       btnCycleCity.addEventListener('click', cycleCityVideo);
     }
 
-    // Cargar vídeo inicial según el horario circadiano
+    // Cargar el primer vídeo de la fase actual y encadenar el resto al terminar
     const initialSec = getBroadcastSecond();
     const initialTrack = getTrackForSecond(initialSec);
     const initialPhase = getPhaseById(initialTrack.phaseId);
     const initialVid = initialTrack.isRitual ? PHASE_VIDEOS['cierre_ritual'] : (PHASE_VIDEOS[initialPhase.id] || PHASE_VIDEOS['dinamismo']);
-    
-    if (wallpaperVideoA) {
-      wallpaperVideoA.poster = initialVid.poster;
-      wallpaperVideoA.src = initialVid.video;
-      wallpaperVideoA.load();
-      wallpaperVideoA.play().catch(() => {});
-      currentVideoUrl = initialVid.video;
-      currentWallpaperUrl = initialVid.video;
-      if (locationCity) {
-        locationCity.textContent = `${initialVid.city} • ${initialVid.subtitle}`;
+    setCityVideo(initialVid);
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        resumeWallpaperPlayback();
       }
-    }
+    });
+    ['click', 'touchstart', 'keydown'].forEach((evt) => {
+      window.addEventListener(evt, resumeWallpaperPlayback, { passive: true });
+    });
+    setInterval(() => {
+      const activeVideo = getActiveWallpaperVideo();
+      if (!activeVideo || !activeVideo.getAttribute('src')) return;
+      if (activeVideo.ended) {
+        playNextWallpaper();
+        return;
+      }
+      if (activeVideo.paused) {
+        playMedia(activeVideo);
+      }
+    }, 5000);
 
     updateVolumeSliderFill();
     initSchedule();

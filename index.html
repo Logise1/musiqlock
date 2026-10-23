@@ -15,10 +15,10 @@
 
   <!-- Fondos Panorámicos en Vídeo con Transición Suave (Cross-Fade) -->
   <div class="wallpaper-video-layer active" id="videoLayerA">
-    <video class="wallpaper-video" id="wallpaperVideoA" autoplay muted loop playsinline preload="auto"></video>
+    <video class="wallpaper-video" id="wallpaperVideoA" autoplay muted playsinline webkit-playsinline x5-playsinline disablePictureInPicture preload="auto"></video>
   </div>
   <div class="wallpaper-video-layer" id="videoLayerB">
-    <video class="wallpaper-video" id="wallpaperVideoB" autoplay muted loop playsinline preload="auto"></video>
+    <video class="wallpaper-video" id="wallpaperVideoB" autoplay muted playsinline webkit-playsinline x5-playsinline disablePictureInPicture preload="none"></video>
   </div>
   <div class="wallpaper-vignette"></div>
 
@@ -114,13 +114,10 @@
   <!-- Elemento Audio Local para el Cierre Ritual con sydney.mp3 -->
   <audio id="localAudio" preload="auto" src="sydney.mp3"></audio>
 
-  <!-- Contenedor Oculto YouTube IFrame API (Dual Player para Cross-fade y Precarga) -->
-  <div id="playerHost" style="position: fixed; width: 200px; height: 200px; opacity: 0.001; pointer-events: none; top: -9999px; left: -9999px; z-index: -1;">
-    <div id="youtubePlayerA"></div>
-    <div id="youtubePlayerB"></div>
-  </div>
+  <!-- Stream directo de YouTube (sin iframe, sin anuncios) -->
+  <audio id="streamPlayerA" preload="auto" playsinline></audio>
+  <audio id="streamPlayerB" preload="auto" playsinline></audio>
 
-  <script src="https://www.youtube.com/iframe_api"></script>
   <script src="schedule.js"></script>
   <script src="app.js"></script>
 </body>
