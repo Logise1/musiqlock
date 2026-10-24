@@ -39,9 +39,8 @@ html, body {
 }
 
 /* ==========================================================================
-   Fondos Dinámicos de Skylines en Foto (Cross-Fade cada 10s)
+   Fondos Dinámicos de Skylines en Vídeo (Cross-Fade Suave entre Fases)
    ========================================================================== */
-.wallpaper-photo-layer,
 .wallpaper-video-layer,
 .wallpaper-background {
   position: fixed;
@@ -52,31 +51,51 @@ html, body {
   background-color: #050608;
   background-size: cover;
   background-position: center;
-  transition: opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1);
-  will-change: opacity;
+  transition: opacity 1.8s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.wallpaper-photo-layer.active,
 .wallpaper-video-layer.active,
 .wallpaper-background.active {
   opacity: 1;
 }
 
-.wallpaper-photo,
 .wallpaper-video {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  min-width: 100%;
-  min-height: 100%;
   object-fit: cover;
   object-position: center;
   pointer-events: none;
   background: #050608;
-  border: 0;
-  display: block;
+}
+
+/* Modo TV: un solo vídeo, sin fades ni compositing que congela el decoder */
+body.tv-safe .wallpaper-video-layer {
+  transition: none !important;
+  will-change: auto !important;
+}
+
+body.tv-safe .wallpaper-video-layer:not(.active) {
+  display: none !important;
+  opacity: 0 !important;
+}
+
+body.tv-safe .wallpaper-video-layer.active {
+  display: block !important;
+  opacity: 1 !important;
+}
+
+body.tv-safe .wallpaper-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  transform: none !important;
+  object-fit: cover;
 }
 
 /* Viñeta para resaltar el reloj en la esquina superior derecha exactamente como en la imagen */
